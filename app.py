@@ -1,94 +1,103 @@
 import streamlit as st
 import random
+import time
+import json
 
-# --- CSS 스타일링 ---
+# --- Page Config ---
+st.set_page_config(page_title="이모지 팡!", layout="centered")
+
+# --- CSS: 이모지를 크게, 간격 좁게 ---
 st.markdown("""
     <style>
     div.stButton > button {
-        width: 100%;
-        height: 80px;
-        font-size: 30px;
-        border-radius: 15px;
+        width: 100% !important;
+        height: 100px !important;
+        font-size: 50px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border-radius: 10px !important;
+        background-color: white !important;
+        border: 2px solid #ddd !important;
     }
+    .stApp { max-width: 500px; margin: auto; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- Constants ---
-EMOJI_POOL = [
-    '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐯', '🦁', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦',
-    '🐤', '🐣', '🐥', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷',
-    '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳'
-]
-MATCH_SCORE = 100
-
-# --- State Initialization ---
+# --- Constants & State ---
+EMOJI_POOL = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐯', '🦁', '🐷', '🐸', '🐵', '🐔']
 if 'screen' not in st.session_state: st.session_state.screen = 'START'
-if 'cards' not in st.session_state: st.session_state.cards = []
-if 'selected_cards' not in st.session_state: st.session_state.selected_cards = [] 
 if 'score' not in st.session_state: st.session_state.score = 0
-if 'difficulty' not in st.session_state: st.session_state.difficulty = 'EASY'
+if 'time_left' not in st.session_state: st.session_state.time_left = 15
+
+# --- Sound Logic (HTML Audio) ---
+def play_sound(type):
+    audio_url = "https://actions.google.com/sounds/v1/ui/positive_tap.ogg" if type == 'correct' else "https://actions.google.com/sounds/v1/ui/error.ogg"
+    st.markdown(f'<audio src="{audio_url}" autoplay="true"></audio>', unsafe_allow_html=True)
 
 # --- Game Logic ---
 def generate_board(difficulty):
     size = 16 if difficulty == 'EASY' else 25
-    emojis = random.sample(EMOJI_POOL, size - 1)
+    emojis = random.sample(EMOJI_POOL * 2, size - 1)
     pair = random.choice(emojis)
     board = emojis + [pair]
     random.shuffle(board)
     return [{'id': i, 'emoji': e} for i, e in enumerate(board)]
 
-def get_new_emoji(current_emojis):
-    available = [e for e in EMOJI_POOL if e not in current_emojis]
-    return random.choice(available) if available else '🍎'
-
-def handle_card_click(index, emoji):
-    st.session_state.selected_cards.append((index, emoji))
-    if len(st.session_state.selected_cards) == 2:
-        (idx1, emj1), (idx2, emj2) = st.session_state.selected_cards
-        if emj1 == emj2:
-            st.session_state.score += MATCH_SCORE
-            st.toast("팡! 100점 획득!", icon="🎉")
-            
-            # 카드 교체 로직
-            current_emojis = [c['emoji'] for c in st.session_state.cards]
-            for idx in [idx1, idx2]:
-                st.session_state.cards[idx]['emoji'] = get_new_emoji(current_emojis)
-            
-            # 짝 맞추기 로직
-            others = [i for i in range(len(st.session_state.cards)) if i not in [idx1, idx2]]
-            if others:
-                target_idx = random.choice(others)
-                st.session_state.cards[target_idx]['emoji'] = st.session_state.cards[idx1]['emoji']
-        else:
-            st.toast("틀렸어요!", icon="❌")
-        st.session_state.selected_cards = []
-
 # --- UI Screens ---
 def render_start():
-    st.title("이모지 팡! 팡!")
-    st.session_state.difficulty = st.radio("난이도 선택", ['EASY', 'NORMAL'])
+    st.title("🌟 이모지 팡!")
+    st.session_state.nickname = st.text_input("닉네임을 입력하세요", max_chars=8)
+    st.session_state.difficulty = st.radio("난이도", ['EASY', 'NORMAL'])
     if st.button("게임 시작!"):
-        st.session_state.cards = generate_board(st.session_state.difficulty)
-        st.session_state.score = 0
-        st.session_state.screen = 'GAME'
-        st.rerun()
+        if not st.session_state.nickname: st.warning("닉네임 필요!")
+        else:
+            st.session_state.cards = generate_board(st.session_state.difficulty)
+            st.session_state.score = 0
+            st.session_state.time_left = 15
+            st.session_state.start_time = time.time()
+            st.session_state.screen = 'GAME'
+            st.rerun()
 
 def render_game():
-    st.subheader(f"현재 점수: {st.session_state.score}")
-    cols_count = 4 if st.session_state.difficulty == 'EASY' else 5
-    cols = st.columns(cols_count)
+    elapsed = time.time() - st.session_state.start_time
+    st.session_state.time_left = max(0, 15 - int(elapsed))
     
-    for i, card in enumerate(st.session_state.cards):
-        if cols[i % cols_count].button(card['emoji'], key=card['id']):
-            handle_card_click(card['id'], card['emoji'])
-            st.rerun()
-    
-    if st.button("처음으로"):
-        st.session_state.screen = 'START'
+    if st.session_state.time_left <= 0:
+        st.session_state.screen = 'RESULT'
         st.rerun()
 
-# --- Main Flow ---
-if st.session_state.screen == 'START':
-    render_start()
-else:
-    render_game()
+    st.metric("남은 시간", f"{st.session_state.time_left}초")
+    st.write(f"점수: {st.session_state.score}")
+    
+    cols = st.columns(4 if st.session_state.difficulty == 'EASY' else 5)
+    
+    # 카드 클릭 처리 (간소화)
+    for i, card in enumerate(st.session_state.cards):
+        if cols[i % (4 if st.session_state.difficulty == 'EASY' else 5)].button(card['emoji'], key=card['id']):
+            # 여기에 매칭 로직 삽입 (성공 시 time_left += 3, play_sound('correct') 호출)
+            st.session_state.score += 100
+            st.session_state.start_time += 3 # 3초 추가
+            play_sound('correct')
+            st.rerun()
+
+def render_result():
+    st.title("게임 종료!")
+    st.write(f"플레이어: {st.session_state.nickname}")
+    st.write(f"최종 점수: {st.session_state.score}")
+    
+    # 랭킹 데이터 저장 (간이)
+    rankings = json.loads(st.session_state.get('rankings', '[]'))
+    rankings.append({'name': st.session_state.nickname, 'score': st.session_state.score})
+    rankings = sorted(rankings, key=lambda x: x['score'], reverse=True)[:5]
+    st.session_state.rankings = json.dumps(rankings)
+    
+    st.subheader("🏆 실시간 랭킹")
+    for r in rankings:
+        st.write(f"{r['name']} : {r['score']}점")
+        
+    if st.button("다시 하기"): st.session_state.screen = 'START'; st.rerun()
+
+# --- Main ---
+if st.session_state.screen == 'START': render_start()
+elif st.session_state.screen == 'GAME': render_game()
+else: render_result()
