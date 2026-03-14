@@ -1,50 +1,65 @@
 import streamlit as st
 import random
 import time
+import json
 
-# 이모지 풀
-EMOJI_POOL = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐯', '🦁', '🐷', '🐸', '🐵', '🐔']
+# --- Constants & Settings ---
+EMOJI_POOL = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐯', '🦁', '🐷', '🐸', '🐵', '🐔', '🐧']
+RANKING_KEY = 'emoji_rank_v4'
 
-st.title("🍎 이모지 짝 맞추기: Emiji Pang!")
+# 세션 상태 초기화
+if "screen" not in st.session_state: st.session_state.screen = 'START'
+if "score" not in st.session_state: st.session_state.score = 0
+if "cards" not in st.session_state: st.session_state.cards = []
 
-# 게임 상태 초기화
-if 'board' not in st.session_state:
-    st.session_state.board = None
-    st.session_state.score = 0
-    st.session_state.selected = []
-
-def generate_board():
-    # 4x4 게임을 위한 8쌍의 이모지 생성
-    sample = random.sample(EMOJI_POOL, 8)
-    board = sample + sample
+def get_new_board():
+    unique_emojis = random.sample(EMOJI_POOL, 8)
+    pair = random.choice(unique_emojis)
+    board = unique_emojis + [pair]
     random.shuffle(board)
-    st.session_state.board = board
-    st.session_state.score = 0
-    st.session_state.selected = []
+    return [{"id": i, "emoji": e} for i, e in enumerate(board)]
 
-if st.button("새 게임 시작"):
-    generate_board()
+# --- 화면별 함수 ---
 
-# 보드 출력
-if st.session_state.board:
-    st.write(f"### 현재 점수: {st.session_state.score}")
+def show_start():
+    st.title("🍎 이모지 팡!")
+    st.write("똑같은 이모지 2개를 찾아보세요!")
+    name = st.text_input("닉네임을 적어주세요")
+    if st.button("게임 시작!"):
+        if name:
+            st.session_state.nickname = name
+            st.session_state.cards = get_new_board()
+            st.session_state.score = 0
+            st.session_state.screen = 'GAME'
+            st.rerun()
+        else:
+            st.warning("닉네임을 입력하세요!")
+
+def show_game():
+    st.title(f"점수: {st.session_state.score}")
     
-    # 4x4 그리드 구성
-    cols = st.columns(4)
-    for i, emoji in enumerate(st.session_state.board):
-        if cols[i % 4].button(f"{emoji}", key=f"btn_{i}"):
-            st.session_state.selected.append(i)
+    # 3x3 그리드 형태
+    cols = st.columns(3)
+    for i, card in enumerate(st.session_state.cards):
+        if cols[i % 3].button(card["emoji"], key=card["id"]):
+            st.session_state.score += 10 # 간단한 클릭 점수 예시
+            st.rerun()
             
-            if len(st.session_state.selected) == 2:
-                idx1, idx2 = st.session_state.selected
-                if st.session_state.board[idx1] == st.session_state.board[idx2]:
-                    st.success("짝을 맞췄어요! 팡!")
-                    st.session_state.score += 100
-                else:
-                    st.error("틀렸어요!")
-                st.session_state.selected = []
-                # 잠시 대기 후 결과 확인을 위해 페이지 새로고침 대신 알림 활용
-                time.sleep(0.5)
-                st.rerun()
+    if st.button("게임 종료"):
+        st.session_state.screen = 'RESULT'
+        st.rerun()
 
-st.info("카드를 클릭하여 똑같은 이모지 2개를 찾아보세요!")
+def show_result():
+    st.title("게임 종료!")
+    st.write(f"최종 점수: {st.session_state.score}")
+    if st.button("처음으로"):
+        st.session_state.screen = 'START'
+        st.rerun()
+
+# --- 메인 루프 ---
+if st.session_state.screen == 'START':
+    show_start()
+elif st.session_state.screen == 'GAME':
+    show_game()
+elif st.session_state.screen == 'RESULT':
+    show_result()
