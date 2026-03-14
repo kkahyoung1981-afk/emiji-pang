@@ -6,8 +6,8 @@ import json
 st.markdown("""
     <style>
     div.stButton > button {
-        width: 200%;
-        height: 250px;
+        width: 20%;
+        height: 50px;
         font-size: 50px;
         border-radius: 35px;
     }
