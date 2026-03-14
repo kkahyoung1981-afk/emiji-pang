@@ -6,10 +6,10 @@ import json
 st.markdown("""
     <style>
     div.stButton > button {
-        width: 100%;
-        height: 80px;
-        font-size: 30px;
-        border-radius: 15px;
+        width: 200%;
+        height: 250px;
+        font-size: 50px;
+        border-radius: 35px;
     }
     </style>
 """, unsafe_allow_html=True)
